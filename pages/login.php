@@ -23,7 +23,7 @@ if (isset($_POST['login'])) {
             $_SESSION['role']     = $data_user['role']; // Baris kunci untuk admin/user
             // ------------------------
 
-            header("Location: dashboard.php"); // Lempar ke dashboard
+            header("Location: home.php"); // Lempar ke menu
             exit;
         }
     }

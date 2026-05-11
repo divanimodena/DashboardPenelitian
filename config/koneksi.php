@@ -2,7 +2,7 @@
 $host = "127.0.0.1";
 $user = "root";
 $pass = "";
-$db   = "db_database_fix";
+$db   = "db_penelitian";
 $port = 3306;
 
 $conn = mysqli_connect($host, $user, $pass, $db, $port);
