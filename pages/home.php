@@ -27,8 +27,10 @@ if ($filterBulan != '') {
 }
 
 // ================= LOGIKA 3 CARD =================
-// 1. Total Anggaran (Sementara statis, nanti kita buat fitur editnya)
-$totalAnggaranPagu = 5000000000; // Contoh: 5 Miliar
+// 1. Ambil Total Anggaran Keseluruhan (Brankas Utama) dari pengaturan_global
+$qGlobal = mysqli_query($conn, "SELECT nilai FROM pengaturan_global WHERE nama_pengaturan = 'total_anggaran_induk'");
+$dGlobal = mysqli_fetch_assoc($qGlobal);
+$totalAnggaranPagu = $dGlobal['nilai'] ?? 0;
 
 // 2. Total Data & 3. Total Realisasi (Berdasarkan Filter Bulan)
 $queryStats = mysqli_query($conn, "SELECT COUNT(*) as jumlah_data, SUM(nilai_realisasi) as total_realisasi FROM data_penelitian $whereClause");
@@ -38,18 +40,9 @@ $totalData = $dataStats['jumlah_data'] ?? 0;
 $totalRealisasi = $dataStats['total_realisasi'] ?? 0;
 
 // ================= LOGIKA TABEL KELTI =================
-$listKelti = [
-    'Bioteknologi dan Bioindustri', 
-    'Ilmu Tanah dan Agronomi', 
-    'Mekanisasi Pasca Panen dan Konservasi Lingkungan', 
-    'Pemuliaan Tanaman', 
-    'Proteksi Tanaman', 
-    'Sosial Ekonomi', 
-    'Kelapa'
-];
+// Ambil daftar Kelti beserta pagunya langsung dari database master_kelti
+$queryTabelKelti = mysqli_query($conn, "SELECT * FROM master_kelti");
 
-// Asumsi alokasi anggaran per Kelti dibagi rata (Bisa diganti nanti)
-$paguPerKelti = $totalAnggaranPagu / 7; 
 ?>
 
 <!DOCTYPE html>
@@ -163,21 +156,25 @@ $paguPerKelti = $totalAnggaranPagu / 7;
                 <tbody>
                     <?php 
                     $no = 1;
-                    foreach ($listKelti as $kelti_name): 
+                    // Loop langsung dari database master_kelti
+                    while($k = mysqli_fetch_assoc($queryTabelKelti)): 
+                        $kelti_name = $k['nama_kelti'];
+                        $paguKelti = $k['pagu_anggaran'];
+
                         // Ambil total realisasi per kelti berdasarkan filter bulan
                         $qKelti = mysqli_query($conn, "SELECT SUM(nilai_realisasi) as real_kelti FROM data_penelitian WHERE kelti = '$kelti_name' " . ($filterBulan != '' ? "AND MONTH(tanggal) = '$filterBulan'" : ""));
                         $dKelti = mysqli_fetch_assoc($qKelti);
                         $realisasiKelti = $dKelti['real_kelti'] ?? 0;
                         
-                        // Hindari minus jika realisasi lebih besar dari pagu (opsional)
-                        $sisaKelti = max(0, $paguPerKelti - $realisasiKelti);
+                        // Hitung sisa anggaran (dicegah agar tidak minus di grafik)
+                        $sisaKelti = max(0, $paguKelti - $realisasiKelti);
                     ?>
                     <tr>
                         <td><?= $no++; ?></td>
                         <td><strong><?= $kelti_name; ?></strong></td>
                         <td>
                             <span style="color: #f59e0b; font-weight:bold;">Rp <?= number_format($realisasiKelti, 0, ',', '.'); ?></span><br>
-                            <small style="color: #94a3b8;">dari Rp <?= number_format($paguPerKelti, 0, ',', '.'); ?></small>
+                            <small style="color: #94a3b8;">dari Rp <?= number_format($paguKelti, 0, ',', '.'); ?></small>
                         </td>
                         <td>
                             <div class="chart-container">
@@ -203,7 +200,7 @@ $paguPerKelti = $totalAnggaranPagu / 7;
                             <a href="detail_kelti.php?kelti=<?= urlencode($kelti_name); ?>" class="btn-view">View Detail</a>
                         </td>
                     </tr>
-                    <?php endforeach; ?>
+                    <?php endwhile; ?>
                 </tbody>
             </table>
         </section>
@@ -212,4 +209,4 @@ $paguPerKelti = $totalAnggaranPagu / 7;
 </div>
 
 </body>
-</html>     
+</html>

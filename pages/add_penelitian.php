@@ -15,12 +15,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <style>
-        /* 2. SAMAKAN CSS OVERRIDE SIDEBAR DENGAN YANG ADA DI DASHBOARD.PHP */
-        .sidebar { display: flex !important; flex-direction: column !important; justify-content: flex-start !important; }
-        .sidebar-menu { margin-top: 20px !important; display: flex !important; flex-direction: column !important; gap: 5px !important; flex-grow: 0 !important; }
-        .menu-item { margin-bottom: 0 !important; padding: 10px 15px !important; display: flex !important; align-items: center !important; line-height: 1.2 !important; }
-        .menu-item i { width: 25px; }
-        .sidebar-bottom { margin-top: auto !important; padding-top: 20px; }
+        /* CSS Sidebar Override TELAH DIHAPUS agar mengikuti struktur baku */
 
         /* --- FORM STYLE KHUSUS HALAMAN INI --- */
         .main-content {
