@@ -1,12 +1,34 @@
 <?php
-    session_start();
-    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-    header("Cache-Control: post-check=0, pre-check=0", false);
-    header("Pragma: no-cache");
-    if (isset($_SESSION['login'])) {
-        header("Location: dashboard.php");
-        exit;
+session_start(); // Pastikan ini ada di baris paling atas
+include '../config/koneksi.php';
+
+if (isset($_POST['login'])) {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+
+    // 1. Cari user di database
+    $result = mysqli_query($conn, "SELECT * FROM users WHERE username = '$username'");
+
+    // 2. Cek apakah user ditemukan
+    if (mysqli_num_rows($result) === 1) {
+        $data_user = mysqli_fetch_assoc($result);
+
+        // 3. Cek apakah passwordnya cocok
+        // (Gunakan password_verify jika dipassword di-hash, atau cek string biasa)
+        if ($password === $data_user['password']) {
+            
+            // --- DISINI TEMPATNYA ---
+            $_SESSION['login']    = true;
+            $_SESSION['username'] = $data_user['username'];
+            $_SESSION['role']     = $data_user['role']; // Baris kunci untuk admin/user
+            // ------------------------
+
+            header("Location: dashboard.php"); // Lempar ke dashboard
+            exit;
+        }
     }
+    $error = true;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -33,8 +55,8 @@
 
                 <div class="login-header">
                     <div class="icon-circle">
-                        <img src="Assets/image/logo_ppks.jpeg" alt="Logo PPKS">
-                    </div>
+    <img src="http://localhost/dashboard_baru/Assets/image/logo_ppks.jpeg" alt="Logo PPKS" style="width: 100%; height: auto;">
+</div>
                     <h2>LOGIN</h2>
                 </div>
 

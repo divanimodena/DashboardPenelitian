@@ -2,7 +2,7 @@
     <div>
         <div class="sidebar-logo">
             <h2>Dashboard</h2>
-            <span>Anggaran</span>
+            <span>Penelitian</span>
 
             <div class="sidebar-subtitle">
                 <small>Pusat Penelitian</small>
@@ -26,10 +26,7 @@
                 <span>Data PBJ</span>
             </a>
 
-            <a href="anggaran.php" class="menu-item <?= ($currentPage == 'anggaran.php') ? 'active' : '' ?>">
-                <i class="fa-solid fa-file-invoice-dollar"></i>
-                <span>Anggaran</span>
-            </a>
+            
 
             <a href="pengguna.php" class="menu-item <?= ($currentPage == 'pengguna.php') ? 'active' : '' ?>">
                 <i class="fa-solid fa-user-group"></i>
