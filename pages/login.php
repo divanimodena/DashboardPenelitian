@@ -36,7 +36,7 @@ if (isset($_POST['login'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Dashboard</title>
-    <link rel="stylesheet" href="/dashboard_baru/Assets/css/style.css">
+    <link rel="stylesheet" href=" ../Assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="login-page">
@@ -55,7 +55,7 @@ if (isset($_POST['login'])) {
 
                 <div class="login-header">
                     <div class="icon-circle">
-    <img src="http://localhost/dashboard_baru/Assets/image/logo_ppks.jpeg" alt="Logo PPKS" style="width: 100%; height: auto;">
+    <img src="../Assets/image/logo_ppks.jpeg" alt="Logo PPKS" style="width: 100%; height: auto;">
 </div>
                     <h2>LOGIN</h2>
                 </div>
