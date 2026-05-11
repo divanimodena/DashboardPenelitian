@@ -38,7 +38,7 @@ if ($keltiSelected) {
 <head>
     <meta charset="UTF-8">
     <title>Summary Kelti</title>
-    <link rel="stylesheet" href="DASHBOARD_BARU/Assets/css/dashboard_modern.css">
+    <link rel="stylesheet" href="../Assets/css/dashboard_modern.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         .stats-cards { display: flex; gap: 15px; margin-bottom: 24px; }
