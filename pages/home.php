@@ -2,6 +2,7 @@
 session_start();
 include '../config/koneksi.php';
 
+// Variabel ini yang akan dibaca oleh sidebar.php untuk menentukan menu mana yang 'active'
 $currentPage = basename($_SERVER['PHP_SELF']);
 
 if (!isset($_SESSION['login'])) {
@@ -78,31 +79,70 @@ $rataAnggaran = $dataStats['rata'] ?? 0;
 </head>
 <body>
 
+<?php if (isset($_GET['status']) && $_GET['status'] == 'sukses'): ?>
+    <div id="custom-toast" class="custom-toast">
+        <div class="toast-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="toast-content">
+            <strong>Berhasil Tersimpan!</strong>
+            <p>Data penelitian baru telah masuk ke dalam sistem.</p>
+        </div>
+        <button class="toast-close" onclick="closeToast()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <style>
+        /* Desain Pesan Kustom */
+        .custom-toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: #ffffff;
+            border-left: 6px solid #16a34a; /* Warna hijau PPKS */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            padding: 16px 24px;
+            gap: 16px;
+            z-index: 9999;
+            /* Animasi masuk dan keluar otomatis */
+            animation: slideIn 0.5s ease-out forwards, fadeOut 0.5s ease-in 4s forwards;
+        }
+        .toast-icon { color: #16a34a; font-size: 28px; }
+        .toast-content strong { color: #1f2937; display: block; font-size: 16px; font-weight: 600; }
+        .toast-content p { margin: 0; color: #6b7280; font-size: 13px; margin-top: 4px; }
+        .toast-close { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 18px; margin-left: 10px; transition: 0.3s; }
+        .toast-close:hover { color: #1f2937; }
+
+        @keyframes slideIn { 
+            from { transform: translateX(120%); opacity: 0; } 
+            to { transform: translateX(0); opacity: 1; } 
+        }
+        @keyframes fadeOut { 
+            from { transform: translateX(0); opacity: 1; } 
+            to { transform: translateX(120%); opacity: 0; } 
+        }
+    </style>
+
+    <script>
+        // Fungsi untuk menutup manual dan membersihkan URL
+        function closeToast() {
+            document.getElementById('custom-toast').style.display = 'none';
+            // Menghapus ?status=sukses dari URL agar jika di-refresh pesannya tidak muncul lagi
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+
+        // Otomatis membersihkan URL setelah animasi fadeOut selesai (4.5 detik)
+        setTimeout(() => {
+            if(document.getElementById('custom-toast')) {
+                window.history.replaceState(null, null, window.location.pathname);
+            }
+        }, 4500);
+    </script>
+    <?php endif; ?>
+
 <div class="dashboard-layout">
     
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <h2>Dashboard</h2>
-            <span>Anggaran</span>
-            <div class="sidebar-subtitle">
-                <small>Pusat Penelitian</small>
-                <strong>Kelapa Sawit</strong>
-            </div>
-        </div>
-
-        <nav class="sidebar-menu">
-            <a href="dashboard.php" class="menu-item active"><i class="fa-solid fa-house"></i> <span>Home</span></a>
-            <a href="summary.php" class="menu-item"><i class="fa-solid fa-chart-column"></i> <span>Ringkasan</span></a>
-            <a href="data_pbj.php" class="menu-item"><i class="fa-solid fa-folder-open"></i> <span>Data PBJ</span></a>
-            <?php if (($_SESSION['role'] ?? 'user') === 'admin') : ?>
-            <a href="pengguna.php" class="menu-item"><i class="fa-solid fa-user-group"></i> <span>Pengguna</span></a>
-            <?php endif; ?>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <a href="logout.php" class="logout-btn"><i class="fa-solid fa-right-from-bracket" style="margin-right: 10px;"></i> <span>Logout</span></a>
-        </div>
-    </aside>
+    <?php include 'sidebar.php'; ?>
 
     <main class="main-content">
         
