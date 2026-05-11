@@ -2,7 +2,6 @@
 session_start();
 include '../config/koneksi.php';
 
-// Variabel ini yang akan dibaca oleh sidebar.php untuk menentukan menu mana yang 'active'
 $currentPage = basename($_SERVER['PHP_SELF']);
 
 if (!isset($_SESSION['login'])) {
@@ -11,33 +10,48 @@ if (!isset($_SESSION['login'])) {
 }
 
 date_default_timezone_set('Asia/Jakarta');
-
-$username = ucfirst($_SESSION['username'] ?? 'User');
+$username = ucfirst($_SESSION['username'] ?? 'Admin');
 $jam = date("H");
 
-// Logika Waktu/Sapaan
-if ($jam >= 5 && $jam < 12) {
-    $greeting = "Good Morning";
-} elseif ($jam >= 12 && $jam < 15) {
-    $greeting = "Good Afternoon";
-} elseif ($jam >= 15 && $jam < 18) {
-    $greeting = "Good Evening";
-} else {
-    $greeting = "Good Night";
+// Sapaan Waktu
+if ($jam >= 5 && $jam < 12) { $greeting = "Good Morning"; } 
+elseif ($jam >= 12 && $jam < 15) { $greeting = "Good Afternoon"; } 
+elseif ($jam >= 15 && $jam < 18) { $greeting = "Good Evening"; } 
+else { $greeting = "Good Night"; }
+
+// ================= LOGIKA FILTER BULAN =================
+$filterBulan = isset($_GET['bulan']) ? $_GET['bulan'] : '';
+$whereClause = "";
+if ($filterBulan != '') {
+    $whereClause = "WHERE MONTH(tanggal) = '$filterBulan'";
 }
 
-/* 1. Ambil Aktivitas Terbaru */
-mysqli_query($conn, "DELETE FROM aktivitas WHERE waktu < NOW() - INTERVAL 1 MINUTE");
-$aktivitasQuery = mysqli_query($conn, "SELECT * FROM aktivitas ORDER BY waktu DESC LIMIT 5");
+// ================= LOGIKA 3 CARD =================
+// 1. Total Anggaran (Sementara statis, nanti kita buat fitur editnya)
+$totalAnggaranPagu = 5000000000; // Contoh: 5 Miliar
 
-/* 2. Total Anggaran, Jumlah PBJ, dan Rata-rata */
-$queryStats = mysqli_query($conn, "SELECT SUM(nilai_anggaran) as total, COUNT(*) as jumlah, AVG(nilai_anggaran) as rata FROM pbj");
+// 2. Total Data & 3. Total Realisasi (Berdasarkan Filter Bulan)
+$queryStats = mysqli_query($conn, "SELECT COUNT(*) as jumlah_data, SUM(nilai_realisasi) as total_realisasi FROM data_penelitian $whereClause");
 $dataStats = mysqli_fetch_assoc($queryStats);
 
-$totalAnggaran = $dataStats['total'] ?? 0;
-$totalPBJ = $dataStats['jumlah'] ?? 0;
-$rataAnggaran = $dataStats['rata'] ?? 0;
+$totalData = $dataStats['jumlah_data'] ?? 0;
+$totalRealisasi = $dataStats['total_realisasi'] ?? 0;
+
+// ================= LOGIKA TABEL KELTI =================
+$listKelti = [
+    'Bioteknologi dan Bioindustri', 
+    'Ilmu Tanah dan Agronomi', 
+    'Mekanisasi Pasca Panen dan Konservasi Lingkungan', 
+    'Pemuliaan Tanaman', 
+    'Proteksi Tanaman', 
+    'Sosial Ekonomi', 
+    'Kelapa'
+];
+
+// Asumsi alokasi anggaran per Kelti dibagi rata (Bisa diganti nanti)
+$paguPerKelti = $totalAnggaranPagu / 7; 
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -46,286 +60,156 @@ $rataAnggaran = $dataStats['rata'] ?? 0;
     <title>Dashboard Anggaran - PPKS</title>
     <link rel="stylesheet" href="../Assets/css/dashboard_modern.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
-        /* --- MENU SIDEBAR --- */
-        .sidebar { display: flex !important; flex-direction: column !important; justify-content: flex-start !important; }
-        .sidebar-menu { margin-top: 20px !important; display: flex !important; flex-direction: column !important; gap: 5px !important; flex-grow: 0 !important; }
-        .menu-item { margin-bottom: 0 !important; padding: 10px 15px !important; display: flex !important; align-items: center !important; line-height: 1.2 !important; }
-        .menu-item i { width: 25px; }
-        .sidebar-bottom { margin-top: auto !important; padding-top: 20px; }
-
-        /* --- AKSI CEPAT --- */
-        .quick-actions-container { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
-        .quick-btn-custom { color: white !important; text-decoration: none !important; display: flex !important; align-items: center; padding: 14px; border-radius: 14px; font-weight: 600; border: none !important; transition: opacity 0.2s ease-in-out; }
-        .quick-btn-custom:hover { opacity: 0.9; }
-        .quick-btn-custom .icon-wrapper { width: 35px; text-align: center; }
-        .btn-tambah { background: linear-gradient(135deg, #4facfe, #00f2fe) !important; }
-        .btn-data   { background: linear-gradient(135deg, #2c3e50, #4ca1af) !important; }
-        .btn-export { background: linear-gradient(135deg, #10b981, #059669) !important; }
-        .btn-import { background: linear-gradient(135deg, #f59e0b, #d97706) !important; }
-
-        /* --- KOTAK NOTIFIKASI & PESAN --- */
-        .action-dropdown { position: relative !important; }
-        .dropdown-box { display: none; position: absolute; top: 45px !important; right: -10px !important; min-width: 250px !important; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 12px; z-index: 1000; overflow: hidden; border: 1px solid #f1f5f9; }
-        .dropdown-box.show { display: block; }
-        .dropdown-header { padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #f1f5f9; background: #f8fafc; color: #334155; font-size: 14px; }
-        .dropdown-item { padding: 12px 15px; font-size: 13px; border-bottom: 1px solid #f8fafc; cursor: pointer; color: #475569; transition: background 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dropdown-item:hover { background: #f1f5f9; }
-
-        /* --- FIX POP-UP TERPOTONG --- */
-        .topbar, .topbar-right, .top-actions { overflow: visible !important; }
+        /* Desain Tambahan untuk Kebutuhan Baru */
+        .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 25px; border-radius: 16px; display: flex; align-items: center; gap: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .stat-icon { width: 60px; height: 60px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; }
+        .bg-blue { background: #2196f3; } .bg-green { background: #4caf50; } .bg-gold { background: #f59e0b; }
+        .stat-text p { margin: 0; color: #64748b; font-size: 14px; }
+        .stat-text h3 { margin: 5px 0 0; font-size: 24px; color: #1e293b; }
+        
+        .table-section { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .filter-select { padding: 8px 15px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 15px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .chart-container { width: 60px; height: 60px; margin: 0 auto; }
+        .btn-view { background: #e6f4ea; color: #16a34a; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.2s; display: inline-block; }
+        .btn-view:hover { background: #16a34a; color: white; }
     </style>
 </head>
 <body>
 
-<?php if (isset($_GET['status']) && $_GET['status'] == 'sukses'): ?>
-    <div id="custom-toast" class="custom-toast">
-        <div class="toast-icon"><i class="fa-solid fa-circle-check"></i></div>
-        <div class="toast-content">
-            <strong>Berhasil Tersimpan!</strong>
-            <p>Data penelitian baru telah masuk ke dalam sistem.</p>
-        </div>
-        <button class="toast-close" onclick="closeToast()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-
-    <style>
-        /* Desain Pesan Kustom */
-        .custom-toast {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            background: #ffffff;
-            border-left: 6px solid #16a34a; /* Warna hijau PPKS */
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            padding: 16px 24px;
-            gap: 16px;
-            z-index: 9999;
-            /* Animasi masuk dan keluar otomatis */
-            animation: slideIn 0.5s ease-out forwards, fadeOut 0.5s ease-in 4s forwards;
-        }
-        .toast-icon { color: #16a34a; font-size: 28px; }
-        .toast-content strong { color: #1f2937; display: block; font-size: 16px; font-weight: 600; }
-        .toast-content p { margin: 0; color: #6b7280; font-size: 13px; margin-top: 4px; }
-        .toast-close { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 18px; margin-left: 10px; transition: 0.3s; }
-        .toast-close:hover { color: #1f2937; }
-
-        @keyframes slideIn { 
-            from { transform: translateX(120%); opacity: 0; } 
-            to { transform: translateX(0); opacity: 1; } 
-        }
-        @keyframes fadeOut { 
-            from { transform: translateX(0); opacity: 1; } 
-            to { transform: translateX(120%); opacity: 0; } 
-        }
-    </style>
-
-    <script>
-        // Fungsi untuk menutup manual dan membersihkan URL
-        function closeToast() {
-            document.getElementById('custom-toast').style.display = 'none';
-            // Menghapus ?status=sukses dari URL agar jika di-refresh pesannya tidak muncul lagi
-            window.history.replaceState(null, null, window.location.pathname);
-        }
-
-        // Otomatis membersihkan URL setelah animasi fadeOut selesai (4.5 detik)
-        setTimeout(() => {
-            if(document.getElementById('custom-toast')) {
-                window.history.replaceState(null, null, window.location.pathname);
-            }
-        }, 4500);
-    </script>
-    <?php endif; ?>
-
 <div class="dashboard-layout">
-    
     <?php include 'sidebar.php'; ?>
 
     <main class="main-content">
-        
         <header class="topbar">
-            <div class="topbar-left">
-                <p class="welcome-label">Dashboard Overview</p>
-                <h1><?= $greeting; ?>, <?= htmlspecialchars($username); ?></h1>
-                <span>Sistem manajemen anggaran operasional perusahaan.</span>
+            <div>
+                <p style="margin:0; color:#64748b;">Dashboard Overview</p>
+                <h1 style="margin:5px 0; font-size: 28px; color:#1e293b;"><?= $greeting; ?>, <?= htmlspecialchars($username); ?></h1>
+                <span style="color:#94a3b8; font-size: 14px;">Sistem manajemen anggaran operasional perusahaan.</span>
             </div>
-
-            <div class="topbar-right">
-                <div class="search-box">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="dashboardSearch" placeholder="Cari fitur...">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div style="width: 40px; height: 40px; background: #20c997; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold;">
+                    <?= strtoupper(substr($username, 0, 1)); ?>
                 </div>
-                
-                <div class="top-actions">
-                    
-                    <div class="action-dropdown">
-                        <button class="icon-btn" id="notifBtn"><i class="fa-regular fa-bell"></i></button>
-                        <div class="dropdown-box" id="notifDropdown">
-                            <div class="dropdown-header">Notifikasi Terbaru</div>
-                            <?php 
-                            $notifQuery = mysqli_query($conn, "SELECT * FROM aktivitas ORDER BY waktu DESC LIMIT 3");
-                            if ($notifQuery && mysqli_num_rows($notifQuery) > 0): 
-                                while ($notif = mysqli_fetch_assoc($notifQuery)):
-                            ?>
-                                <div class="dropdown-item">
-                                    <?= htmlspecialchars($notif['ikon']); ?> <?= htmlspecialchars($notif['judul']); ?>
-                                </div>
-                            <?php 
-                                endwhile; 
-                            else: 
-                            ?>
-                                <div class="dropdown-item" style="color: #94a3b8; text-align: center;">Belum ada notifikasi</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="action-dropdown">
-                        <button class="icon-btn" id="mailBtn"><i class="fa-regular fa-envelope"></i></button>
-                        <div class="dropdown-box" id="mailDropdown">
-                            <div class="dropdown-header">Kotak Masuk</div>
-                            <div class="dropdown-item">👤 Admin: Mohon cek data terbaru.</div>
-                            <div class="dropdown-item">👤 Sistem: Backup berhasil.</div>
-                        </div>
-                    </div>
-
-                    <div class="profile-chip">
-                        <div class="profile-avatar"><?= strtoupper(substr($username, 0, 1)); ?></div>
-                        <div class="profile-info">
-                            <small>Akun</small>
-                            <span><?= htmlspecialchars($username); ?></span>
-                        </div>
-                    </div>
+                <div>
+                    <small style="display:block; color:#94a3b8;">Akun</small>
+                    <strong><?= htmlspecialchars($username); ?></strong>
                 </div>
             </div>
         </header>
 
         <section class="stats-grid">
-            <div class="stat-card link-card" data-search="anggaran dana total">
-                <div class="stat-icon green"><i class="fa-solid fa-wallet"></i></div>
+            <div class="stat-card">
+                <div class="stat-icon bg-blue"><i class="fa-solid fa-wallet"></i></div>
                 <div class="stat-text">
-                    <p>Total Anggaran</p>
-                    <h3>Rp <?= number_format($totalAnggaran / 1000000000, 2); ?> M</h3>
-                    <span>Seluruh data masuk</span>
+                    <p>Total Anggaran Induk</p>
+                    <h3>Rp <?= number_format($totalAnggaranPagu / 1000000000, 2); ?> M</h3>
                 </div>
             </div>
-            <div class="stat-card link-card" data-search="data pbj dokumen">
-                <div class="stat-icon olive"><i class="fa-solid fa-folder-open"></i></div>
+            <div class="stat-card">
+                <div class="stat-icon bg-green"><i class="fa-solid fa-folder-open"></i></div>
                 <div class="stat-text">
-                    <p>Total Data PBJ</p>
-                    <h3><?= $totalPBJ; ?> Dokumen</h3>
-                    <span>Data tersimpan di sistem</span>
+                    <p>Total Data Penelitian</p>
+                    <h3><?= $totalData; ?> Dokumen</h3>
                 </div>
             </div>
-            <div class="stat-card link-card" data-search="rata rata anggaran">
-                <div class="stat-icon gold"><i class="fa-solid fa-chart-pie"></i></div>
+            <div class="stat-card">
+                <div class="stat-icon bg-gold"><i class="fa-solid fa-chart-pie"></i></div>
                 <div class="stat-text">
-                    <p>Rata-rata Anggaran</p>
-                    <h3>Rp <?= number_format($rataAnggaran / 1000000, 1); ?> Jt</h3>
-                    <span>Rata-rata per pengajuan</span>
+                    <p>Total Realisasi</p>
+                    <h3>Rp <?= number_format($totalRealisasi / 1000000, 1); ?> Jt</h3>
                 </div>
             </div>
         </section>
 
-        <div class="bottom-grid">
-            <div class="activity-card">
-                <div class="card-header">
-                    <h3>Aktivitas Terbaru</h3>
-                    <span><?= date('d M Y'); ?></span>
-                </div>
-                <div class="activity-list">
-                    <?php if ($aktivitasQuery && mysqli_num_rows($aktivitasQuery) > 0): ?>
+        <section class="table-section">
+            <div class="table-header">
+                <h3>Serapan Anggaran per Kelti</h3>
+                
+                <form action="" method="GET">
+                    <select name="bulan" class="filter-select" onchange="this.form.submit()">
+                        <option value="">-- Semua Bulan --</option>
                         <?php 
-                        mysqli_data_seek($aktivitasQuery, 0); // Reset pointer query
-                        while ($row = mysqli_fetch_assoc($aktivitasQuery)) : 
+                        $namaBulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                        foreach ($namaBulan as $index => $nama) {
+                            $angkaBulan = $index + 1;
+                            $selected = ($filterBulan == $angkaBulan) ? 'selected' : '';
+                            echo "<option value='$angkaBulan' $selected>$nama</option>";
+                        }
                         ?>
-                            <div class="activity-item">
-                                <div class="activity-avatar"><?= htmlspecialchars($row['ikon']); ?></div>
-                                <div>
-                                    <strong><?= htmlspecialchars($row['judul']); ?></strong>
-                                    <p><?= htmlspecialchars($row['deskripsi']); ?></p>
-                                </div>
-                            </div>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <div class="activity-item">
-                            <div class="activity-avatar">📌</div>
-                            <div>
-                                <strong>Belum ada aktivitas</strong>
-                                <p>Sistem siap menerima input baru.</p>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                    </select>
+                </form>
             </div>
 
-            <div class="quick-card">
-                <div class="card-header">
-                    <h3>Aksi Cepat</h3>
-                </div>
-                <div class="quick-actions-container">
-                    <a href="tambah_pbj.php" class="quick-btn-custom btn-tambah">
-                        <div class="icon-wrapper"><i class="fa-solid fa-plus-circle"></i></div>
-                        <span>Tambah Anggaran</span>
-                    </a>
-                    <a href="data_pbj.php" class="quick-btn-custom btn-data">
-                        <div class="icon-wrapper"><i class="fa-solid fa-database"></i></div>
-                        <span>Data PBJ</span>
-                    </a>
-                    <a href="export_excel.php" class="quick-btn-custom btn-export">
-                        <div class="icon-wrapper"><i class="fa-solid fa-file-export"></i></div>
-                        <span>Export Laporan</span>
-                    </a>
-                    <a href="import_pbj.php" class="quick-btn-custom btn-import">
-                        <div class="icon-wrapper"><i class="fa-solid fa-file-import"></i></div>
-                        <span>Import Data</span>
-                    </a>
-                </div>
-            </div>
-        </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="5%">No</th>
+                        <th width="35%">Nama Kelti</th>
+                        <th width="25%">Realisasi / Pagu</th>
+                        <th width="20%" style="text-align: center;">Grafik Serapan</th>
+                        <th width="15%" style="text-align: center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $no = 1;
+                    foreach ($listKelti as $kelti_name): 
+                        // Ambil total realisasi per kelti berdasarkan filter bulan
+                        $qKelti = mysqli_query($conn, "SELECT SUM(nilai_realisasi) as real_kelti FROM data_penelitian WHERE kelti = '$kelti_name' " . ($filterBulan != '' ? "AND MONTH(tanggal) = '$filterBulan'" : ""));
+                        $dKelti = mysqli_fetch_assoc($qKelti);
+                        $realisasiKelti = $dKelti['real_kelti'] ?? 0;
+                        
+                        // Hindari minus jika realisasi lebih besar dari pagu (opsional)
+                        $sisaKelti = max(0, $paguPerKelti - $realisasiKelti);
+                    ?>
+                    <tr>
+                        <td><?= $no++; ?></td>
+                        <td><strong><?= $kelti_name; ?></strong></td>
+                        <td>
+                            <span style="color: #f59e0b; font-weight:bold;">Rp <?= number_format($realisasiKelti, 0, ',', '.'); ?></span><br>
+                            <small style="color: #94a3b8;">dari Rp <?= number_format($paguPerKelti, 0, ',', '.'); ?></small>
+                        </td>
+                        <td>
+                            <div class="chart-container">
+                                <canvas id="chart_<?= $no; ?>"></canvas>
+                            </div>
+                            <script>
+                                new Chart(document.getElementById('chart_<?= $no; ?>'), {
+                                    type: 'doughnut',
+                                    data: {
+                                        labels: ['Terpakai', 'Sisa Anggaran'],
+                                        datasets: [{
+                                            data: [<?= $realisasiKelti ?>, <?= $sisaKelti ?>],
+                                            backgroundColor: ['#f59e0b', '#22c55e'], // Oranye & Hijau
+                                            borderWidth: 0,
+                                            cutout: '70%'
+                                        }]
+                                    },
+                                    options: { plugins: { legend: { display: false }, tooltip: { enabled: true } }, maintainAspectRatio: false }
+                                });
+                            </script>
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="detail_kelti.php?kelti=<?= urlencode($kelti_name); ?>" class="btn-view">View Detail</a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </section>
+
     </main>
 </div>
 
-<script>
-    // 1. Fitur Pencarian
-    document.getElementById('dashboardSearch').addEventListener('keyup', function () {
-        const keyword = this.value.toLowerCase().trim();
-        const cards = document.querySelectorAll('.link-card');
-        cards.forEach(card => {
-            const text = (card.dataset.search || '').toLowerCase();
-            card.style.display = (keyword === '' || text.includes(keyword)) ? 'flex' : 'none';
-        });
-    });
-
-    // 2. Dropdown Interaksi
-    const notifBtn = document.getElementById('notifBtn');
-    const mailBtn = document.getElementById('mailBtn');
-    const notifDropdown = document.getElementById('notifDropdown');
-    const mailDropdown = document.getElementById('mailDropdown');
-
-    if(notifBtn && notifDropdown) {
-        notifBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            notifDropdown.classList.toggle('show');
-            if(mailDropdown) mailDropdown.classList.remove('show'); 
-        });
-    }
-
-    if(mailBtn && mailDropdown) {
-        mailBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            mailDropdown.classList.toggle('show');
-            if(notifDropdown) notifDropdown.classList.remove('show'); 
-        });
-    }
-
-    document.addEventListener('click', function() {
-        if(notifDropdown) notifDropdown.classList.remove('show');
-        if(mailDropdown) mailDropdown.classList.remove('show');
-    });
-</script>
-
 </body>
-</html>
+</html>     

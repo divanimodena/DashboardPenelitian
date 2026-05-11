@@ -9,7 +9,7 @@
     </div>
 
     <nav class="sidebar-menu">
-        <a href="dashboard.php" class="menu-item <?= ($currentPage == 'home.php') ? 'active' : '' ?>">
+        <a href="home.php" class="menu-item <?= ($currentPage == 'home.php') ? 'active' : '' ?>">
             <i class="fa-solid fa-house"></i>
             <span>Home</span>
         </a>
